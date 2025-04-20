@@ -186,8 +186,6 @@ def JB2008_dens_func(t, h, density_data, date_mapping, nearest_altitude_mapping)
 
     date_floor = date_mapping[t_index_floor]
     date_ceil = date_mapping[t_index_ceil]
-
-    print("[" + date_floor + ", " + date_ceil + "]")
     
     # Interpolation weight
     if t_index_floor == t_index_ceil:
