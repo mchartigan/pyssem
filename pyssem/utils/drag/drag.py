@@ -144,7 +144,7 @@ def preload_density_data(file_path):
     return density_data
 
 # Function to precompute date mapping for given time range
-def precompute_date_mapping(start_date, end_date, num_points=101):
+def precompute_date_mapping(start_date, end_date, num_points):
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
     total_days = (end_date - start_date).days
