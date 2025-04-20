@@ -298,8 +298,8 @@ def assign_species_to_population(T, species_mapping):
     print(T['species_class'].value_counts())
 
     try:
-        T = T[T['species_class'] != "Unknown"]
         print(f"\n{T['species_class'].value_counts()['Unknown']} objects/rows are being removed.")
+        T = T[T['species_class'] != "Unknown"]
     except KeyError:
         print("No unknown species classes found.")
 
