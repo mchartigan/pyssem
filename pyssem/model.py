@@ -37,12 +37,11 @@ class Model:
         baseline (bool, optional): If True, assumes no further launches.
         indicator_variables (dict, optional): Additional indicator variables for the model.
     """
-
-    def __init__(self, start_date, simulation_duration, steps, min_altitude, max_altitude,
-                 n_shells, launch_function, integrator, density_model, LC,
-                 v_imp=None,
-                 fragment_spreading=True, parallel_processing=False, baseline=False,
-                 indicator_variables=None):
+    def __init__(self, start_date, simulation_duration, steps, min_altitude, max_altitude, 
+                        n_shells, launch_function, integrator, density_model, LC, 
+                        v_imp=None,
+                        fragment_spreading=True, parallel_processing=False, baseline=False, 
+                        indicator_variables=None, launch_scenario=None, SEP_mapping=None):
         """
         Initialize the scenario properties for the simulation model.
 
@@ -105,7 +104,9 @@ class Model:
                 fragment_spreading=fragment_spreading,
                 parallel_processing=parallel_processing,
                 baseline=baseline,
-                indicator_variables=indicator_variables
+                indicator_variables=indicator_variables,
+                launch_scenario=launch_scenario,
+                SEP_mapping=SEP_mapping,
             )
 
         except Exception as e:
@@ -182,10 +183,7 @@ class Model:
         if not isinstance(self.scenario_properties, ScenarioProperties):
             raise ValueError("Invalid scenario properties provided.")
         try:
-
-            # Initial population is considered but not launch
-            self.scenario_properties.initial_pop_and_launch(
-                baseline=self.scenario_properties.baseline)
+            self.scenario_properties.initial_pop_and_launch(baseline=self.scenario_properties.baseline, launch_file=self.scenario_properties.launch_scenario) # Initial population is considered but not launch
             self.scenario_properties.build_model()
             self.scenario_properties.run_model()
 
@@ -219,7 +217,7 @@ class Model:
 
 if __name__ == "__main__":
 
-    with open(os.path.join('pyssem', 'simulation_configurations', 'three_species.json')) as f:
+    with open(os.path.join('pyssem', 'simulation_configurations', 'example-sim.json')) as f:
         simulation_data = json.load(f)
 
     scenario_props = simulation_data["scenario_properties"]
@@ -241,7 +239,9 @@ if __name__ == "__main__":
         fragment_spreading=scenario_props.get("fragment_spreading", False),
         parallel_processing=scenario_props.get("parallel_processing", True),
         baseline=scenario_props.get("baseline", False),
-        indicator_variables=scenario_props.get("indicator_variables", None)
+        indicator_variables=scenario_props.get("indicator_variables", None),
+        launch_scenario=scenario_props["launch_scenario"],
+        SEP_mapping=simulation_data["SEP_mapping"] if "SEP_mapping" in simulation_data else None,
     )
 
     species = simulation_data["species"]
@@ -250,9 +250,16 @@ if __name__ == "__main__":
 
     results = model.run_model()
 
+    data = model.results_to_json()
+    # Create the figures directory if it doesn't exist
+    os.makedirs(f'figures/{simulation_data["simulation_name"]}', exist_ok=True)
+    # Save the results to a JSON file
+    with open(f'figures/{simulation_data["simulation_name"]}/results.json', 'w') as f:
+        json.dump(data, f, indent=4)
+
     try:
         plot_names = simulation_data["plots"]
-        Plots(model.scenario_properties, plot_names)
+        Plots(model.scenario_properties, plot_names, simulation_data["simulation_name"])
     except Exception as e:
         print(e)
         print("No plots specified in the simulation configuration file.")
