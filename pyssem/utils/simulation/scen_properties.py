@@ -545,7 +545,8 @@ class ScenarioProperties:
             self.drag_cur_lamd = [sp.lambdify(self.all_symbolic_vars, eq, 'numpy') for eq in drag_current_flattened]
 
             # Set up time varying density 
-            self.density_data = preload_density_data(os.path.join('pyssem', 'pyssem', 'utils', 'drag', 'dens_SSP1-26_2000-2100.json'))
+            self.density_data = preload_density_data(os.path.join('pyssem', 'pyssem', 'utils', 'drag', 'dens_SSP1-26_2000-2100.json')) # HOW TO CHANGE THE SSP
+            # self.density_data = preload_density_data(os.path.join('pyssem', 'pyssem', 'utils', 'drag', 'dens_highvar_2000_dens_highvar_2000_lookup.json'))
             self.date_mapping = precompute_date_mapping(pd.to_datetime(self.start_date), pd.to_datetime(self.end_date), self.steps)
             
             # This will change when jb2008 is updated
