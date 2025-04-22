@@ -545,8 +545,8 @@ class ScenarioProperties:
             self.drag_cur_lamd = [sp.lambdify(self.all_symbolic_vars, eq, 'numpy') for eq in drag_current_flattened]
 
             # Set up time varying density 
+            self.density_data = preload_density_data(os.path.join('pyssem', 'pyssem', 'utils', 'drag', 'dens_SSP1-26_2000-2100.json')) # HOW TO CHANGE THE SSP
             # self.density_data = preload_density_data(os.path.join('pyssem', 'pyssem', 'utils', 'drag', 'dens_highvar_2000_dens_highvar_2000_lookup.json'))
-            self.density_data = preload_density_data(os.path.join('pyssem','pyssem', 'utils', 'drag', 'dens_SSP2-45_2000-2100.json'))
             self.date_mapping = precompute_date_mapping(pd.to_datetime(self.start_date), pd.to_datetime(self.end_date), self.steps)
             
             # This will change when jb2008 is updated
@@ -558,14 +558,15 @@ class ScenarioProperties:
             self.prev_t = -1  # Initialize to an invalid time
             self.prev_rho = None
 
-
             # Progress Bar
             self.progress_bar = tqdm(total=self.scen_times[-1] - self.scen_times[0], desc="Integrating Equations", unit="year")
 
+            # Integrate Equations
             output = solve_ivp(self.population_shell_time_varying_density, [self.scen_times[0], self.scen_times[-1]], x0,
                             args=(full_lambda_flattened, equations, self.scen_times),
                             t_eval=self.scen_times, method=self.integrator)
 
+            # Close out
             self.progress_bar.close()
             self.progress_bar = None # Set back to None becuase a tqdm object cannot be pickled
             
@@ -634,7 +635,7 @@ class ScenarioProperties:
         if self.progress_bar is not None:
             self.progress_bar.update(t - self.progress_bar.n)
 
-
+        # Clean the derivative array
         dN_dt = np.zeros_like(N)
 
         if self.time_dep_density:

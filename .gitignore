@@ -168,3 +168,6 @@ pyssem/utils/launch/data/
 
 # Figures folder
 /figures/
+
+
+*.DS_Store
