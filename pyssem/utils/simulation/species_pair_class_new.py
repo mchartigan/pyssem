@@ -3,8 +3,7 @@ from sympy import symbols, Matrix, pi, S, Expr, zeros
 import numpy as np
 
 class SpeciesPairClass:
-    def __init__(self, species1, species2, gammas, source_sinks, scen_properties, fragment_spread_totals=None, fragsMadeDV=None,
-                 model_type='baseline'):
+    def __init__(self, species1, species2, gammas, source_sinks, scen_properties, fragment_spread_totals, fragsMadeDV=None):
         """
         This makes the species pair class associated with a collision between species1
         and species2. It will then create equations for the collision probability modifiers
@@ -24,6 +23,8 @@ class SpeciesPairClass:
             source_sinks (list): A list of species that are either sources or sinks in the collision
             scen_properties (ScenarioProperties): The scenario properties object
         """
+
+
         self.fragment_spread_totals = fragment_spread_totals
         self.fragments = fragsMadeDV
         if gammas.shape[1] != len(source_sinks):
@@ -52,17 +53,11 @@ class SpeciesPairClass:
         M1 = species1.mass
         M2 = species2.mass
         LC = scen_properties.LC
-        
             
         self.gammas = gammas
         self.source_sinks = source_sinks
-        
-        if model_type == 'elliptical':
-            self.eqs_sources = Matrix(scen_properties.n_shells, len(all_species), lambda i, j: 0)
-            self.eqs_sinks = Matrix(scen_properties.n_shells, len(all_species), lambda i, j: 0)
-        else:
-            self.eqs = Matrix(scen_properties.n_shells, len(all_species), lambda i, j: 0)
-
+        self.eqs_sources = Matrix(scen_properties.n_shells, len(all_species), lambda i, j: 0)
+        self.eqs_sinks = Matrix(scen_properties.n_shells, len(all_species), lambda i, j: 0)
 
         if isinstance(self.phi, (int, float, Expr)):
             phi_matrix = Matrix([self.phi] * len(gamma))
@@ -85,62 +80,21 @@ class SpeciesPairClass:
             if eq_index is None:
                 raise ValueError(f"Equation index not found for {source_sinks[i].sym_name}")
             
-            n_f = symbols(f'n_f:{scen_properties.n_shells}')
+            eq = gamma.multiply_elementwise(phi_matrix).multiply_elementwise(species1.sym).multiply_elementwise(species2.sym)
 
-            if scen_properties.fragment_spreading:
-                if i < 2:  # As first two columns are the reduction of the species in the collision (i.e -1)
-                    eq = gamma.multiply_elementwise(phi_matrix).multiply_elementwise(species1.sym).multiply_elementwise(species2.sym)
-                else:  # Debris generated from collision
-                    try:                         
-                        fragsMadeDVcurrentDeb = fragsMadeDV[:, i-2] # First two rows are the reduction of the species in the collision (i.e -1)
-
-                        # Create the 2D fragment matrix with circular shifts
-                        fragsMade2D_list = [np.roll(fragsMadeDVcurrentDeb, shift) for shift in range(scen_properties.n_shells + 1)]
-                        fragsMade2D = np.column_stack(fragsMade2D_list)
-
-                        # Adjust the slicing to match MATLAB's slicing
-                        fragsMade2D = fragsMade2D[scen_properties.n_shells:, :scen_properties.n_shells]  # from N_shell:end for rows, 1:N_shell for columns
-                        fragsMade2D_sym = Matrix(fragsMade2D)
-
-                        # Use the species product matrix and repeat it for each shell, this will allow all symbolic variables to be affected across all shells
-                        rep_mat_sym = Matrix.vstack(*[product_sym for _ in range(scen_properties.n_shells)])
-
-                        # Perform element-wise multiplication
-                        sum_ = fragsMade2D_sym.multiply_elementwise(rep_mat_sym)
-                                          
-                        # Sum the columns of the multiplied_matrix
-                        sum_matrix = Matrix([sum(sum_[row, :]) for row in range(sum_.shape[0])])
-
-                        # Multiply gammas, phi, and the sum_matrix element-wise
-                        eq = -gammas[:, 0].multiply_elementwise(phi_matrix).multiply_elementwise(sum_matrix)
-
-                        # Plotting (similar to MATLAB's imagesc)
-                        # plt.figure(100)
-                        # plt.clf()
-                        # plt.imshow(fragsMade2D, aspect='auto', interpolation='none')
-                        # plt.colorbar()
-                        # plt.title(f"{self.name} for {source_sinks[i].sym_name}", fontsize=10)
-                        # plt.gca().invert_yaxis()
-                        # plt.savefig(f"figures/frag_spread/fragsMade2D_{source_sinks[i].sym_name}.png")
-                        # print(f"eq: {eq}")
-                    except Exception as e:
-                        if np.any(fragsMadeDV == 0):
-                            eq = gamma.multiply_elementwise(phi_matrix).multiply_elementwise(species1.sym).multiply_elementwise(species2.sym)
-                            continue
-                        # print(f"Error in creating debris matrix: {e}")
-            elif model_type == 'elliptical':
-                eq = gamma.multiply_elementwise(phi_matrix).multiply_elementwise(species1.sym).multiply_elementwise(species2.sym)
-                if i < 2:
-                    # These are the sinks
-                    self.eqs_sinks[:, eq_index] = self.eqs_sinks[:, eq_index] + eq
-                else:
-                    # Sources:
-                    self.eqs_sources[:, eq_index] = self.eqs_sources[:, eq_index] + eq
-
+            if i < 2:
+                # These are the sinks
+                self.eqs_sinks[:, eq_index] = self.eqs_sinks[:, eq_index] + eq
+            # elif species1.sym_name == species2.sym_name:
+            #         if species1.sym_name == all_species[eq_index].sym_name:
+            #             # Self-sink: remove from self
+            #             self.eqs_sinks[:, eq_index] += eq
+            #         else:
+            #             # Self → other species: treated as source
+            #             self.eqs_sources[:, eq_index] += eq
             else:
-                eq = gamma.multiply_elementwise(phi_matrix).multiply_elementwise(species1.sym).multiply_elementwise(species2.sym)
-                
-                self.eqs[:, eq_index] = self.eqs[:, eq_index] + eq  
+                # Sources:
+                self.eqs_sources[:, eq_index] = self.eqs_sources[:, eq_index] + eq
             
 
     def is_catastrophic(self, mass1, mass2, vels):

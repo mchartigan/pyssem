@@ -6,6 +6,8 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 import multiprocessing as mp
+import math
+import random
 
 
 def func_Am(d, ObjClass):
@@ -56,15 +58,27 @@ def func_dv(Am, mode):
     Returns:
         np.ndarray: Calculated delta-v values for each fragment.
     """
-    if mode == 'col':
-       mu = 0.2 * np.log10(Am) + 1.85 # Explosion
-    elif mode == 'exp':
-        mu = 0.9 * np.log10(Am) + 2.9
+    # ensure Am is a list of floats
+    if isinstance(Am, (int, float)):
+        Am_list = [float(Am)]
+    else:
+        Am_list = [float(x) for x in Am]
 
     sigma = 0.4
-    N = mu + sigma * np.random.randn(*np.shape(mu))
-    z = 10 ** N # m/s
-    return z 
+    result = []
+    for am_val in Am_list:
+        if mode == 'col':
+            mu_val = 0.9 * math.log10(am_val) + 2.9
+        elif mode == 'exp':
+            mu_val = 1.85 * math.log10(am_val) + 1.85
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+        # add Gaussian noise
+        N_val = mu_val + sigma * random.gauss(0, 1)
+        result.append(10 ** N_val)
+
+    # return scalar if single input, else list
+    return result[0] if len(result) == 1 else result
 
 def calculate_amsms_for_rocket_body(logd):
     """
@@ -286,7 +300,7 @@ def evolve_bins(m1, m2, r1, r2, dv1, dv2, binC, binE, binW, LBdiam, source_sinks
         # find difference in orbital velocity for shells
         # dDV = np.abs(np.median(np.diff(np.sqrt(MU / (RE + R02)) * 1000))) # use equal spacing in dv space for binning to altitude base 
         dDV = np.abs(np.median(np.diff(np.sqrt(MU / (RE + np.arange(200, 2000, 50))) * 1000)))
-        dv_values = func_dv(Am, 'col') / 1000 # km/s
+        dv_values = np.array(func_dv(Am, 'col')) / 1000 # km/s
         u = np.random.rand(len(dv_values)) * 2 - 1
         theta = np.random.rand(len(dv_values)) * 2 * np.pi
 
@@ -351,6 +365,8 @@ def process_species_pair(args):
     frags_made = np.zeros((len(scen_properties.v_imp2), len(debris_species)))
     alt_nums = np.zeros((scen_properties.n_shells * 2, len(debris_species)))
 
+    # This will need to use the new evolve bins and then bin into semi-major-axis, ecc, mass
+
     # This will tell you the number of fragments in each debris bin
     for dv_index, dv in enumerate(scen_properties.v_imp2): # This is the case for circular orbits 
 
@@ -360,44 +376,16 @@ def process_species_pair(args):
         if scen_properties.fragment_spreading:
             try:
                 results = evolve_bins(m1, m2, r1, r2, dv1, dv2, [], binE, [], LBgiven, RBflag, source_sinks, scen_properties.fragment_spreading, scen_properties.n_shells, scen_properties.R0_km)
-
-                if s1.elliptical or s2.elliptical:
-                    if s1.elliptical and s2.elliptical:
-                        # Both are elliptical, take the product of the time_per_shells values
-                        time_factor = s1.time_per_shells[dv_index][dv_index] * s2.time_per_shells[dv_index][dv_index]
-                    elif s1.elliptical:
-                        time_factor = s1.time_per_shells[dv_index][dv_index]
-                    else:
-                        # Only s2 is elliptical, use its time_per_shells value
-                        time_factor = s2.time_per_shells[dv_index][dv_index]
-                    
-                    frags_made[dv_index, :] = results[0] * time_factor
-                    alt_nums = results[3] * time_factor
-
-                else:
-                    frags_made[dv_index, :] = results[0]
-                    alt_nums = results[3]
+                frags_made[dv_index, :] = results[0] # nums is the number of fragments related to the shell of dv_index (same shell)
+                alt_nums = results[3] # Is the additional term from the spreading of the collision (all other shells)
             except IndexError as ie:
-                alt_nums  = None
+                alt_nums = None
                 continue
             except ValueError as e:
                 continue
         else:
             results = evolve_bins(m1, m2, r1, r2, dv1, dv2, [], binE, [], LBgiven, RBflag, source_sinks)
-            # Check if s1 or s2 is elliptical
-            if s1.elliptical or s2.elliptical:
-                if s1.elliptical and s2.elliptical:
-                    # Both are elliptical, take the product of the time_per_shells values
-                    time_factor = s1.time_per_shells[dv_index][dv_index] * s2.time_per_shells[dv_index][dv_index]
-                elif s1.elliptical:
-                    time_factor = s1.time_per_shells[dv_index][dv_index]
-                else:
-                    # Only s2 is elliptical, use its time_per_shells value
-                    time_factor = s2.time_per_shells[dv_index][dv_index]
-                
-                frags_made[dv_index, :] = results[0] * time_factor
-            else:
-                frags_made[dv_index, :] = results[0]
+            frags_made[dv_index, :] = results[0]
 
     for i, species in enumerate(debris_species):
         frags_made_sym = Matrix(frags_made[:, i]) 
