@@ -1,0 +1,5 @@
+SEP2: Just model 1154.82 seconds | Inlcuding Collisions: 1559.13
+SEP2: Just model 473.51 seconds | Inlcuding Collisions: 658.28
+SEP2: Just model 272.17 seconds | Inlcuding Collisions: 407.74
+SEP2: Just model 7609.86 seconds | Inlcuding Collisions: 7732.06
+SEP2: Just model 8454.50 seconds | Inlcuding Collisions: 8576.99

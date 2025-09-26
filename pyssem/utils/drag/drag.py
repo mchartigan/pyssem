@@ -15,7 +15,7 @@ import os
 #     Returns:
 #         np.ndarray: Atmospheric density in kg/m^3
 #     """
-    
+
 #     # Convert h to a numpy array for vectorized operations
 #     h = np.array(h)
 
@@ -66,15 +66,16 @@ import os
 
 #     return p
 
+
 def densityexp(h_km):
     """
     Vallado Table 8-4 exponential density model (vectorized), matching the MATLAB densityexp_vec.
-    
+
     Parameters
     ----------
     h_km : array_like
         Altitude above the ellipsoid in **kilometers** (must be >= 0).
-    
+
     Returns
     -------
     p : ndarray
@@ -84,16 +85,16 @@ def densityexp(h_km):
     h = np.asarray(h_km, dtype=float)
 
     # Lower edges h0 and corresponding (p0, H) for each interval
-    h0 = np.array([   0,    25,    30,    40,    50,    60,    70,    80,    90,   100,
-                     110,   120,   130,   140,   150,   180,   200,   250,   300,   350,
-                     400,   450,   500,   600,   700,   800,   900,  1000], dtype=float)
+    h0 = np.array([0,    25,    30,    40,    50,    60,    70,    80,    90,   100,
+                   110,   120,   130,   140,   150,   180,   200,   250,   300,   350,
+                   400,   450,   500,   600,   700,   800,   900,  1000], dtype=float)
     p0 = np.array([1.225, 3.899e-2, 1.774e-2, 3.972e-3, 1.057e-3, 3.206e-4, 8.770e-5, 1.905e-5,
                    3.396e-6, 5.297e-7, 9.661e-8, 2.438e-8, 8.484e-9, 3.845e-9, 2.070e-9, 5.464e-10,
                    2.789e-10, 7.248e-11, 2.418e-11, 9.518e-12, 3.725e-12, 1.585e-12, 6.967e-13,
                    1.454e-13, 3.614e-14, 1.170e-14, 5.245e-15, 3.019e-15], dtype=float)
-    H  = np.array([7.249, 6.349, 6.682, 7.554, 8.382, 7.714, 6.549, 5.799, 5.382, 5.877,
-                   7.263, 9.473, 12.636, 16.149, 22.523, 29.740, 37.105, 45.546, 53.628, 53.298,
-                   58.515, 60.828, 63.822, 71.835, 88.667, 124.64, 181.05, 268.00], dtype=float)
+    H = np.array([7.249, 6.349, 6.682, 7.554, 8.382, 7.714, 6.549, 5.799, 5.382, 5.877,
+                  7.263, 9.473, 12.636, 16.149, 22.523, 29.740, 37.105, 45.546, 53.628, 53.298,
+                  58.515, 60.828, 63.822, 71.835, 88.667, 124.64, 181.05, 268.00], dtype=float)
 
     # Build edges exactly like MATLAB: [0, 25, 30, ..., 1000, Inf]
     edges = np.concatenate([h0, [np.inf]])
@@ -116,7 +117,7 @@ def densityexp(h_km):
 
 # def densityexp(h):
 #     """
-#     Calculates atmospheric density based on altitude using a 
+#     Calculates atmospheric density based on altitude using a
 #     simple exponential model (Vallado, Table 8-4).
 
 #     Args:
@@ -169,7 +170,7 @@ def densityexp(h_km):
 #     # np.digitize with bins = h0[1:] gives:
 #     #   idx = 0 for h <  25 km  → layer 0 (h0=0)
 #     #   idx = 1 for 25 ≤ h < 30 km → layer 1 (h0=25)
-#     #   … 
+#     #   …
 #     #   idx = 29 for h ≥ 1000 km    → layer 29 (h0=1000)
 #     idx = np.digitize(h, bins=h0[1:], right=False)
 
@@ -177,6 +178,7 @@ def densityexp(h_km):
 #     ρ = p0[idx] * np.exp((h0[idx] - h) / H[idx])
 
 #     return ρ
+
 
 def densityexp_jbvalues(h):
     """
@@ -206,7 +208,8 @@ def densityexp_jbvalues(h):
 
     # Linear interpolation of log-density for smoothness
     log_densities = np.log(ref_densities)
-    interp_logs = np.interp(h, ref_altitudes, log_densities, left=np.nan, right=np.nan)
+    interp_logs = np.interp(
+        h, ref_altitudes, log_densities, left=np.nan, right=np.nan)
     densities = np.exp(interp_logs)
 
     return densities
@@ -225,6 +228,7 @@ def drag_func_none(t, species, scen_properties):
     """
 
     return zeros(scen_properties.n_shells, 1)
+
 
 def drag_func_exp(t, h, species, scen_properties):
     """
@@ -250,24 +254,32 @@ def drag_func_exp(t, h, species, scen_properties):
 
     if species.drag_effected:
         # Set up equations for the rate of change of the semi major axis, density not included
-        for k in range(scen_properties.n_shells):            
+        for k in range(scen_properties.n_shells):
 
             # Check the shell is not the top shell
             if k < scen_properties.n_shells - 1:
                 n0 = species.sym[k+1]
                 # Calculate Drag Flux (Relative Velocity)
-                rvel_upper[k] = -species.beta * sqrt(scen_properties.mu * scen_properties.R0[k+1]) * seconds_per_year
-            
+                rvel_upper[k] = -species.beta * \
+                    sqrt(scen_properties.mu *
+                         scen_properties.R0[k+1]) * seconds_per_year
+
             # Otherwise assume that no flux is coming down from the highest shell
             else:
                 n0 = 0
-                rvel_upper[k] = -species.beta * sqrt(scen_properties.mu * scen_properties.R0[k+1]) * seconds_per_year
-        
-            rvel_current[k] = -species.beta * np.sqrt(scen_properties.mu * scen_properties.R0[k]) * seconds_per_year
+                rvel_upper[k] = -species.beta * \
+                    sqrt(scen_properties.mu *
+                         scen_properties.R0[k+1]) * seconds_per_year
+
+            rvel_current[k] = -species.beta * \
+                np.sqrt(scen_properties.mu *
+                        scen_properties.R0[k]) * seconds_per_year
             upper_term[k] = n0 * rvel_upper[k] / scen_properties.Dhu
-            current_term[k] = rvel_current[k] / scen_properties.Dhl * species.sym[k]
-    
+            current_term[k] = rvel_current[k] / \
+                scen_properties.Dhl * species.sym[k]
+
     return upper_term, current_term
+
 
 def static_exp_dens_func(t, h, species, scen_properties):
     """
@@ -284,9 +296,10 @@ def static_exp_dens_func(t, h, species, scen_properties):
     """
     # val = densityexp_jbvalues(h)
 
-    old = densityexp(h) 
+    old = densityexp(h)
 
     return old
+
 
 def preload_density_data(file_path):
     with open(file_path, 'r') as file:
@@ -294,15 +307,20 @@ def preload_density_data(file_path):
     return density_data
 
 # Function to precompute date mapping for given time range
+
+
 def precompute_date_mapping(start_date, end_date, num_points):
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
     total_days = (end_date - start_date).days
-    dates = [start_date + pd.to_timedelta(i / (num_points - 1) * total_days, unit='d') for i in range(num_points)]
+    dates = [start_date + pd.to_timedelta(i / (num_points - 1)
+                                          * total_days, unit='d') for i in range(num_points)]
     date_mapping = [date.strftime('%Y-%m') for date in dates]
     return date_mapping
 
 # Function to precompute nearest altitude mapping using KDTree for efficient lookup
+
+
 def precompute_nearest_altitudes(available_altitudes, max_query=2000, resolution=1):
     altitude_tree = KDTree(np.array(available_altitudes).reshape(-1, 1))
     altitude_mapping = {}
@@ -311,6 +329,7 @@ def precompute_nearest_altitudes(available_altitudes, max_query=2000, resolution
         nearest_alt = available_altitudes[idx[0]]
         altitude_mapping[alt] = nearest_alt
     return altitude_mapping
+
 
 def JB2008_dens_func(t, h, density_data, date_mapping, nearest_altitude_mapping):
     """
@@ -326,7 +345,7 @@ def JB2008_dens_func(t, h, density_data, date_mapping, nearest_altitude_mapping)
     """
     num_dates = len(date_mapping)
     t_normalized = min(max(t / 100 * (num_dates - 1), 0), num_dates - 1)
-    
+
     # Find the two nearest indices and their corresponding dates
     t_index_floor = int(np.floor(t_normalized))
     t_index_ceil = int(np.ceil(t_normalized))
@@ -336,26 +355,29 @@ def JB2008_dens_func(t, h, density_data, date_mapping, nearest_altitude_mapping)
 
     date_floor = date_mapping[t_index_floor]
     date_ceil = date_mapping[t_index_ceil]
-    
+
     # Interpolation weight
     if t_index_floor == t_index_ceil:
         weight = 1
     else:
-        weight = (t_normalized - t_index_floor) / (t_index_ceil - t_index_floor)
+        weight = (t_normalized - t_index_floor) / \
+            (t_index_ceil - t_index_floor)
 
     # Get density values for the floor and ceil dates
     density_values_floor = []
     density_values_ceil = []
 
     for alt in h:
-        query_alt = round(min(alt, max(nearest_altitude_mapping.keys())), 0) # wont index if a decimal
+        # wont index if a decimal
+        query_alt = round(min(alt, max(nearest_altitude_mapping.keys())), 0)
         nearest_alt = nearest_altitude_mapping[query_alt]
 
         try:
             density_floor = density_data[date_floor][str(nearest_alt)]
             density_ceil = density_data[date_ceil][str(nearest_alt)]
         except KeyError as e:
-            print(f"KeyError: {e} for date_floor: {date_floor}, date_ceil: {date_ceil}, nearest_alt: {nearest_alt}")
+            print(
+                f"KeyError: {e} for date_floor: {date_floor}, date_ceil: {date_ceil}, nearest_alt: {nearest_alt}")
             return None
 
         density_values_floor.append(density_floor)
@@ -364,10 +386,12 @@ def JB2008_dens_func(t, h, density_data, date_mapping, nearest_altitude_mapping)
     # Ensure that the interpolated values correctly capture the cyclical variations
     density_values_floor = np.array(density_values_floor)
     density_values_ceil = np.array(density_values_ceil)
-    
-    density_values = density_values_floor * (1 - weight) + density_values_ceil * weight
+
+    density_values = density_values_floor * \
+        (1 - weight) + density_values_ceil * weight
 
     return density_values
 
+
 if __name__ == "__main__":
-    print(densityexp(500))
+    print(densityexp(220))

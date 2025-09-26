@@ -7,7 +7,7 @@ import time
 
 
 def run_one_sep(sep_name):
-    
+
     sep_json = f"{sep_name}.json"
     with open(os.path.join('pyssem', 'simulation_configurations', sep_json)) as f:
         simulation_data = json.load(f)
@@ -16,9 +16,13 @@ def run_one_sep(sep_name):
 
     start_time = time.time()
 
+    # with open("scenario-properties-SEP2.pkl", "rb") as file:
+    #     data = pickle.load(file)
+
     # Create an instance of the pySSEM_model with the simulation parameters
     model = Model(
-        start_date=scenario_props["start_date"].split("T")[0],  # Assuming the date is in ISO format
+        start_date=scenario_props["start_date"].split(
+            "T")[0],  # Assuming the date is in ISO format
         simulation_duration=scenario_props["simulation_duration"],
         steps=scenario_props["steps"],
         min_altitude=scenario_props["min_altitude"],
@@ -28,7 +32,7 @@ def run_one_sep(sep_name):
         integrator=scenario_props["integrator"],
         density_model=scenario_props["density_model"],
         LC=scenario_props["LC"],
-        v_imp = scenario_props.get("v_imp", None), 
+        v_imp=scenario_props.get("v_imp", None),
         fragment_spreading=scenario_props.get("fragment_spreading", False),
         parallel_processing=scenario_props.get("parallel_processing", True),
         baseline=scenario_props.get("baseline", False),
@@ -50,7 +54,7 @@ def run_one_sep(sep_name):
 
     data = model.results_to_json()
 
-    # dump the pickle file in the same directory 
+    # dump the pickle file in the same directory
 
     # Create the figures directory if it doesn't exist
     os.makedirs(f'figures/{simulation_data["simulation_name"]}', exist_ok=True)
@@ -63,12 +67,14 @@ def run_one_sep(sep_name):
 
     try:
         plot_names = simulation_data["plots"]
-        Plots(model.scenario_properties, plot_names, simulation_data["simulation_name"])
+        Plots(model.scenario_properties, plot_names,
+              simulation_data["simulation_name"])
     except Exception as e:
         print(e)
         print("No plots specified in the simulation configuration file.")
 
     return elapsed, elapsed_just_model
+
 
 if __name__ == "__main__":
 
@@ -77,12 +83,14 @@ if __name__ == "__main__":
     results_path = os.path.join(os.getcwd(), "results.txt")
 
     for sep in seps:
-        
-        elapsed, elapsed_just_model = run_one_sep(sep)  # your simulation function
-        
+
+        elapsed, elapsed_just_model = run_one_sep(
+            sep)  # your simulation function
+
         result_line = f"{sep}: Just model {elapsed_just_model:.2f} seconds | Inlcuding Collisions: {elapsed:.2f}\n"
-        
+
         with open(results_path, "a") as f:
             f.write(result_line)
 
-        print(f"✅ Finished {sep} in {elapsed:.2f} seconds (logged to results.txt)")
+        print(
+            f"✅ Finished {sep} in {elapsed:.2f} seconds (logged to results.txt)")
