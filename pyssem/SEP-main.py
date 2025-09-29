@@ -16,9 +16,6 @@ def run_one_sep(sep_name):
 
     start_time = time.time()
 
-    # with open("scenario-properties-SEP2.pkl", "rb") as file:
-    #     data = pickle.load(file)
-
     # Create an instance of the pySSEM_model with the simulation parameters
     model = Model(
         start_date=scenario_props["start_date"].split(

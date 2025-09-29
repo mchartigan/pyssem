@@ -1458,7 +1458,7 @@ class ScenarioProperties:
             output = solve_ivp(self.population_shell_time_varying_density, [self.scen_times[0], self.scen_times[-1]], x0,
                                args=(self.full_lambda_flattened,
                                      self.equations, self.scen_times),
-                               t_eval=self.scen_times, method=self.integrator)
+                               t_eval=self.scen_times, method=self.integrator, rtol=1e-6, atol=1e-8, max_step=1)
 
             # Close out
             self.progress_bar.close()
@@ -2301,8 +2301,6 @@ class ScenarioProperties:
             else:
                 rho = self.prev_rho  # Use cached rho
 
-            rho_full = np.repeat(rho, self.species_length)
-
             species_per_shell = self.species_length
 
             # Apply drag computations
@@ -2312,13 +2310,13 @@ class ScenarioProperties:
                 # Ensure drag_cur_lamd and drag_upper_lamd functions are correctly accessed and used
                 if i < len(N) - 1:
                     current_drag = self.drag_cur_lamd[i](
-                        *N) * rho_full[shell_index]
+                        *N) * rho[shell_index]
                     upper_drag = self.drag_upper_lamd[i](
-                        *N) * rho_full[shell_index + 1]
+                        *N) * rho[shell_index + 1]
                     dN_dt[i] += current_drag + upper_drag
                 else:
                     current_drag = self.drag_cur_lamd[i](
-                        *N) * rho_full[shell_index]
+                        *N) * rho[shell_index]
                     dN_dt[i] += current_drag
 
                 # Handle incoming new species
