@@ -1,12 +1,16 @@
-from .utils.simulation.scen_properties import ScenarioProperties
-from .utils.simulation.species import Species
-from .utils.collisions.collisions import create_collision_pairs
-from .utils.plotting.plotting import Plots, results_to_json
+# from .utils.simulation.scen_properties import ScenarioProperties
+# from .utils.simulation.species import Species
+# from .utils.collisions.collisions import create_collision_pairs
+# from .utils.plotting.plotting import Plots, results_to_json
 # if testing locally, use the following import statements
-# from utils.simulation.scen_properties import ScenarioProperties
-# from utils.simulation.species import Species
+from utils.simulation.scen_properties import ScenarioProperties
+from utils.simulation.species import Species
+from utils.collisions.collisions_elliptical import create_elliptical_collision_pairs
 # from utils.collisions.collisions import create_collision_pairs
-# from utils.plotting.plotting import Plots, results_to_json
+from utils.collisions.collisions import create_collision_pairs
+from utils.plotting.plotting import Plots, results_to_json
+from utils.plotting.SEPDataExport import *
+from utils.plotting.EllipticalOuputsToAltitudeBins import *
 from datetime import datetime
 import json
 import os
@@ -37,11 +41,13 @@ class Model:
         baseline (bool, optional): If True, assumes no further launches.
         indicator_variables (dict, optional): Additional indicator variables for the model.
     """
-    def __init__(self, start_date, simulation_duration, steps, min_altitude, max_altitude, 
-                        n_shells, launch_function, integrator, density_model, LC, 
-                        v_imp=None,
-                        fragment_spreading=True, parallel_processing=False, baseline=False, 
-                        indicator_variables=None, launch_scenario=None, SEP_mapping=None):
+
+    def __init__(self, start_date, simulation_duration, steps, min_altitude, max_altitude,
+                 n_shells, launch_function, integrator, density_model, LC,
+                 v_imp=None,
+                 fragment_spreading=True, parallel_processing=False, baseline=False,
+                 indicator_variables=None, launch_scenario=None, SEP_mapping=None,
+                 elliptical=False, eccentricity_bins=None):
         """
         Initialize the scenario properties for the simulation model.
 
@@ -107,6 +113,8 @@ class Model:
                 indicator_variables=indicator_variables,
                 launch_scenario=launch_scenario,
                 SEP_mapping=SEP_mapping,
+                elliptical=elliptical,
+                eccentricity_bins=eccentricity_bins
             )
 
         except Exception as e:
@@ -133,10 +141,11 @@ class Model:
         try:
             species_list = Species()
 
-            species_list.add_species_from_json(species_json)
+            _, self.scenario_properties.pmd_debris_names = species_list.add_species_from_json(
+                species_json)
 
             # Set up elliptical orbits for species
-            # species_list.set_elliptical_orbits(self.scenario_properties.n_shells, self.scenario_properties.R0_km, self.scenario_properties.HMid, self.scenario_properties.mu, self.scenario_properties.parallel_processing)
+            species_list.set_elliptical_orbits(self.scenario_properties)
 
             # Pass functions for drag and PMD
             species_list.convert_params_to_functions()
@@ -161,6 +170,11 @@ class Model:
             if self.scenario_properties.indicator_variables is not None:
                 self.scenario_properties.build_indicator_variables()
 
+            # Initial population of species and any launches
+            # Initial population is considered but not launch
+            self.scenario_properties.initial_pop_and_launch(
+                baseline=self.scenario_properties.baseline, launch_file=self.scenario_properties.launch_scenario)
+
             return species_list
         except json.JSONDecodeError:
             raise ValueError("Invalid JSON format for species.")
@@ -183,16 +197,28 @@ class Model:
         if not isinstance(self.scenario_properties, ScenarioProperties):
             raise ValueError("Invalid scenario properties provided.")
         try:
-            self.scenario_properties.initial_pop_and_launch(baseline=self.scenario_properties.baseline, launch_file=self.scenario_properties.launch_scenario) # Initial population is considered but not launch
-            self.scenario_properties.build_model()
-            self.scenario_properties.run_model()
+            if self.scenario_properties.elliptical:
+                self.scenario_properties.build_model_elliptical()
+                self.scenario_properties.run_model_elliptical()
+            else:
+                self.scenario_properties.build_model()
+                self.scenario_properties.run_model()
+
+            self.scenario_properties.equations = None
+            self.scenario_properties.lambdify_equations = None
+            self.scenario_properties.lambdify_launch = None
+            self.scenario_properties.collision_terms = None
+            self.scenario_properties.full_Cdot_PMD = None
+
+            with open('scenario-properties-collision.pkl', 'wb') as f:
+                pickle.dump(self.scenario_properties, f)
 
             # CSI Index
             # self.scenario_properties.cum_CSI()
 
-            # save self as a pickle file
-            with open('scenario-properties-baseline.pkl', 'wb') as f:
-                pickle.dump(self.scenario_properties, f)
+            # save self as a pickle file - first drop the launch as it can't be pickled
+            self.scenario_properties.coll_eqs_lambd = None
+            self.scenario_properties.equations = None
 
         except Exception as e:
             raise RuntimeError(f"Failed to run model: {str(e)}")
@@ -217,7 +243,7 @@ class Model:
 
 if __name__ == "__main__":
 
-    with open(os.path.join('pyssem', 'simulation_configurations', 'example-sim.json')) as f:
+    with open(os.path.join('pyssem', 'simulation_configurations', 'elliptical-simple.json')) as f:
         simulation_data = json.load(f)
 
     scenario_props = simulation_data["scenario_properties"]
@@ -242,24 +268,48 @@ if __name__ == "__main__":
         indicator_variables=scenario_props.get("indicator_variables", None),
         launch_scenario=scenario_props["launch_scenario"],
         SEP_mapping=simulation_data["SEP_mapping"] if "SEP_mapping" in simulation_data else None,
+        elliptical=scenario_props.get("elliptical", None),
+        eccentricity_bins=scenario_props.get("eccentricity_bins", None)
     )
 
     species = simulation_data["species"]
 
     species_list = model.configure_species(species)
 
+    import time
+
+    # === TIME THE EXECUTION ===
+    start = time.time()
     results = model.run_model()
+    end = time.time()
+
+    elapsed_sec = end - start
+    print(f"Model run completed in {elapsed_sec:.2f} seconds")
+
+    # === WRITE TIME TO TEXT FILE ===
+    with open("model_runtime.txt", "w") as f:
+        f.write(f"Model run time: {elapsed_sec:.2f} seconds\n")
+
+    print("Runtime saved to model_runtime.txt")
 
     data = model.results_to_json()
-    # Create the figures directory if it doesn't exist
-    os.makedirs(f'figures/{simulation_data["simulation_name"]}', exist_ok=True)
+
+    # # # Create the figures directory if it doesn't exist
+    main_path = 'figures'
+    if not os.path.exists(main_path):
+        os.makedirs(main_path)
+
+    # Create a subdirectory for the simulation name
+    os.makedirs(
+        f'{main_path}/{simulation_data["simulation_name"]}', exist_ok=True)
     # Save the results to a JSON file
-    with open(f'figures/{simulation_data["simulation_name"]}/results.json', 'w') as f:
+    with open(f'{main_path}/{simulation_data["simulation_name"]}/results.json', 'w') as f:
         json.dump(data, f, indent=4)
 
     try:
         plot_names = simulation_data["plots"]
-        Plots(model.scenario_properties, plot_names, simulation_data["simulation_name"])
+        Plots(model.scenario_properties, plot_names,
+              simulation_data["simulation_name"])
     except Exception as e:
         print(e)
         print("No plots specified in the simulation configuration file.")
