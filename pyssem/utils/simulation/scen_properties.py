@@ -2291,6 +2291,7 @@ class ScenarioProperties:
         dN_dt = np.zeros_like(N)
 
         if self.time_dep_density:
+            '''
             # Cache management logic for rho
             current_t_step = int(t)
             if current_t_step > self.prev_t:
@@ -2300,12 +2301,15 @@ class ScenarioProperties:
                 self.prev_t = current_t_step
             else:
                 rho = self.prev_rho  # Use cached rho
-
-            species_per_shell = self.species_length
+            '''
+            rho = JB2008_dens_func(
+                t, self.R0_km, self.density_data, self.date_mapping, self.nearest_altitude_mapping)
 
             # Apply drag computations
             for i in range(len(N)):
-                shell_index = i // species_per_shell
+                # get appropriate shell index, as the flattened functions iterate over every shell
+                # within a species first (rather than each species in a shell)
+                shell_index = i % self.n_shells
 
                 # Ensure drag_cur_lamd and drag_upper_lamd functions are correctly accessed and used
                 if i < len(N) - 1:
